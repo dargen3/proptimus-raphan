@@ -5,7 +5,7 @@ PROPTIMUS-RAPHAN je python program implementující algoritmus Per Residuum Opti
 ## How to run
 
 ```bash
-$  python ppropt.py --cpu 16 --PDB_file examples/AF-P0DL07-F1-model_v4_protonated_ph7.pdb --data_dir PODL07_test --run_full_xtb_optimisation
+$  python ppropt.py --cpu 16 --PDB_file examples/P0DL07.pdb --data_dir PODL07_test --run_full_xtb_optimisation
 ```
 
 
