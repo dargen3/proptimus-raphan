@@ -10,7 +10,7 @@ $  python proptimus-raphan.py --cpu 6 --PDB_file examples/P0DL07.pdb --data_dir 
 Struktury examples/P0DL07_optimised.pdb a P0DL07_test/optimised_structure/P0DL07_optimised_final.pdb by měly být totožné.
 
 V adresáři P0DL07 by měl být soubor data.json, který by měl vypadat nějak takto :
-
+```
 {
     "proptimus time": 2.480051279067993,       # může se mírně lišit
     "xtb(original) time": 1.620025396347046,   # může se mírně lišit
@@ -19,4 +19,4 @@ V adresáři P0DL07 by měl být soubor data.json, který by měl vypadat nějak
     "proptimus/xtb(proptimus) MAD": 0.028605064377188683,    # mělo by být stejné
     "xtb(proptimus)/xtb(original)": 0.09751877188682556      # mělo by být stejné
 }
-
+```
