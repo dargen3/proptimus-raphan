@@ -254,19 +254,19 @@ def optimise_substructure(substructure_data,
         original_atom_index = substructure_atoms[optimised_atom_index - 1].serial_number - 1
         optimised_coordinates.append((original_atom_index, optimised_atom_coord))
 
-    # check proptimus convergence
-    proptimus_converged = False
+    # check raphan convergence
+    raphan_converged = False
     if len(substructure_data.archive) > 1:
         max_diffs = []
         for x in range(1, 3):
             diffs = [dist(a,b) for a,b in zip([x[1] for x in optimised_coordinates], substructure_data.archive[-x])]
             max_diffs.append(max(diffs))
         if any([x<0.01 for x in max_diffs]):
-            proptimus_converged = True
-    return optimised_coordinates, all([xtb_converged, proptimus_converged]), substructure_data
+            raphan_converged = True
+    return optimised_coordinates, all([xtb_converged, raphan_converged]), substructure_data
 
 
-class Proptimus:
+class Raphan:
     def __init__(self,
                  data_dir: str,
                  PDB_file: str,
@@ -358,49 +358,49 @@ class Proptimus:
         print("ok")
 
 
-def run_full_xtb_optimisation(proptimus):
+def run_full_xtb_optimisation(raphan):
     print("Running full xtb optimisation...", end="")
 
     # find alpha_carbons_indices to constrain them
     alpha_carbons_indices = []
-    structure = PDBParser(QUIET=True).get_structure("structure", proptimus.PDB_file)
+    structure = PDBParser(QUIET=True).get_structure("structure", raphan.PDB_file)
     for i, atom in enumerate(structure.get_atoms(), start=1):
         if atom.name == "CA":
             alpha_carbons_indices.append(str(i))
 
 
     # optimise original structure by xtb
-    system(f"mkdir {proptimus.data_dir}/full_xtb_optimisation ")
-    system(f"mkdir {proptimus.data_dir}/full_xtb_optimisation/original ")
-    with open(f"{proptimus.data_dir}/full_xtb_optimisation/original/xtb_settings.inp", "w") as xtb_settings_file:
+    system(f"mkdir {raphan.data_dir}/full_xtb_optimisation ")
+    system(f"mkdir {raphan.data_dir}/full_xtb_optimisation/original ")
+    with open(f"{raphan.data_dir}/full_xtb_optimisation/original/xtb_settings.inp", "w") as xtb_settings_file:
         xtb_settings_file.write(f"$constrain\n    force constant=10.0\n    atoms: {",".join(alpha_carbons_indices)}\n$end""")
     t = time()
-    system(f"""cd {proptimus.data_dir}/full_xtb_optimisation/original;
+    system(f"""cd {raphan.data_dir}/full_xtb_optimisation/original;
                export OMP_NUM_THREADS=1,1 ;
                export MKL_NUM_THREADS=1 ;
                export OMP_MAX_ACTIVE_LEVELS=1 ;
                export OMP_STACKSIZE=200G ;
                ulimit -s unlimited ;
-               xtb ../../inputed_PDB/{path.basename(proptimus.PDB_file)} --opt --alpb water --verbose --gfnff --input xtb_settings.inp --verbose > xtb_output.txt 2> xtb_error_output.txt""")
+               xtb ../../inputed_PDB/{path.basename(raphan.PDB_file)} --opt --alpb water --verbose --gfnff --input xtb_settings.inp --verbose > xtb_output.txt 2> xtb_error_output.txt""")
     xtb_original_time = time() - t
 
-    # optimise structure optimised with proptimus
-    system(f"mkdir {proptimus.data_dir}/full_xtb_optimisation/proptimus ")
-    with open(f"{proptimus.data_dir}/full_xtb_optimisation/proptimus/xtb_settings.inp", "w") as xtb_settings_file:
+    # optimise structure optimised with raphan
+    system(f"mkdir {raphan.data_dir}/full_xtb_optimisation/raphan ")
+    with open(f"{raphan.data_dir}/full_xtb_optimisation/raphan/xtb_settings.inp", "w") as xtb_settings_file:
         xtb_settings_file.write(f"$constrain\n    force constant=10.0\n    atoms: {",".join(alpha_carbons_indices)}\n$end""")
     t = time()
-    system(f"""cd {proptimus.data_dir}/full_xtb_optimisation/proptimus ;
+    system(f"""cd {raphan.data_dir}/full_xtb_optimisation/raphan ;
                export OMP_NUM_THREADS=1,1 ;
                export MKL_NUM_THREADS=1 ;
                export OMP_MAX_ACTIVE_LEVELS=1 ;
                export OMP_STACKSIZE=200G ;
                ulimit -s unlimited ;
-               xtb ../../optimised_PDB/{path.basename(proptimus.PDB_file[:-4])}_optimised.pdb --opt --alpb water --verbose --gfnff --input xtb_settings.inp --verbose > xtb_output.txt 2> xtb_error_output.txt""")
-    xtb_proptimus_time = time() - t
+               xtb ../../optimised_PDB/{path.basename(raphan.PDB_file[:-4])}_optimised.pdb --opt --alpb water --verbose --gfnff --input xtb_settings.inp --verbose > xtb_output.txt 2> xtb_error_output.txt""")
+    xtb_raphan_time = time() - t
 
     # compare original structure with original structure optimised by xtb
-    s1 = PDBParser(QUIET=True).get_structure(id="structure", file=proptimus.PDB_file)
-    s2 = PDBParser(QUIET=True).get_structure(id="structure", file=f"{proptimus.data_dir}/full_xtb_optimisation/original/xtbopt.pdb")
+    s1 = PDBParser(QUIET=True).get_structure(id="structure", file=raphan.PDB_file)
+    s2 = PDBParser(QUIET=True).get_structure(id="structure", file=f"{raphan.data_dir}/full_xtb_optimisation/original/xtbopt.pdb")
     sup = Superimposer()
     sup.set_atoms([a for a in s1.get_atoms() if a.name == "CA"], [a for a in s2.get_atoms() if a.name == "CA"])
     sup.apply(s2.get_atoms())
@@ -409,36 +409,36 @@ def run_full_xtb_optimisation(proptimus):
         d.append(a1 - a2)
     original_xtb_original_difference = sum(d)/len(d)
 
-    # compare structure optimised by proptimus and structure optimised by proptimus and subsequently by xtb
-    s1 = PDBParser(QUIET=True).get_structure(id="structure", file=f"{proptimus.data_dir}/optimised_PDB/{path.basename(proptimus.PDB_file[:-4])}_optimised.pdb")
-    s2 = PDBParser(QUIET=True).get_structure(id="structure", file=f"{proptimus.data_dir}/full_xtb_optimisation/proptimus/xtbopt.pdb")
+    # compare structure optimised by raphan and structure optimised by raphan and subsequently by xtb
+    s1 = PDBParser(QUIET=True).get_structure(id="structure", file=f"{raphan.data_dir}/optimised_PDB/{path.basename(raphan.PDB_file[:-4])}_optimised.pdb")
+    s2 = PDBParser(QUIET=True).get_structure(id="structure", file=f"{raphan.data_dir}/full_xtb_optimisation/raphan/xtbopt.pdb")
     sup = Superimposer()
     sup.set_atoms([a for a in s1.get_atoms() if a.name == "CA"], [a for a in s2.get_atoms() if a.name == "CA"])
     sup.apply(s2.get_atoms())
     d = []
     for a1, a2 in zip(s1.get_atoms(), s2.get_atoms()):
         d.append(a1 - a2)
-    proptimus_xtb_proptimus_difference = sum(d) / len(d)
+    raphan_xtb_raphan_difference = sum(d) / len(d)
 
-    # compare original structure optimised by xtb and structure optimised by proptimus and subsequently by xtb
-    s1 = PDBParser(QUIET=True).get_structure(id="structure", file=f"{proptimus.data_dir}/full_xtb_optimisation/original/xtbopt.pdb")
-    s2 = PDBParser(QUIET=True).get_structure(id="structure", file=f"{proptimus.data_dir}/full_xtb_optimisation/proptimus/xtbopt.pdb")
+    # compare original structure optimised by xtb and structure optimised by raphan and subsequently by xtb
+    s1 = PDBParser(QUIET=True).get_structure(id="structure", file=f"{raphan.data_dir}/full_xtb_optimisation/original/xtbopt.pdb")
+    s2 = PDBParser(QUIET=True).get_structure(id="structure", file=f"{raphan.data_dir}/full_xtb_optimisation/raphan/xtbopt.pdb")
     sup = Superimposer()
     sup.set_atoms([a for a in s1.get_atoms() if a.name == "CA"], [a for a in s2.get_atoms() if a.name == "CA"])
     sup.apply(s2.get_atoms())
     d = []
     for a1, a2 in zip(s1.get_atoms(), s2.get_atoms()):
         d.append(a1 - a2)
-    xtb_original_xtb_proptimus_difference = sum(d) / len(d)
+    xtb_original_xtb_raphan_difference = sum(d) / len(d)
 
     # write results
-    results = {"proptimus time": proptimus.calculation_time,
+    results = {"raphan time": raphan.calculation_time,
                "xtb(original) time": xtb_original_time,
-               "xtb(proptimus) time": xtb_proptimus_time,
+               "xtb(raphan) time": xtb_raphan_time,
                "original/xtb(original) MAD": float(original_xtb_original_difference),
-               "proptimus/xtb(proptimus) MAD": float(proptimus_xtb_proptimus_difference),
-               "xtb(proptimus)/xtb(original)": float(xtb_original_xtb_proptimus_difference)}
-    with open(f"{proptimus.data_dir}/data.json", 'w') as data_json:
+               "raphan/xtb(raphan) MAD": float(raphan_xtb_raphan_difference),
+               "xtb(raphan)/xtb(original)": float(xtb_original_xtb_raphan_difference)}
+    with open(f"{raphan.data_dir}/data.json", 'w') as data_json:
         json.dump(results, data_json, indent=4)
     print(" ok")
 
@@ -446,10 +446,10 @@ def run_full_xtb_optimisation(proptimus):
 if __name__ == '__main__':
     args = load_arguments()
     t = time()
-    proptimus = Proptimus(args.data_dir, args.PDB_file, args.cpu, args.delete_auxiliary_files)
-    proptimus.optimise()
-    proptimus.calculation_time = time() - t
+    raphan = Raphan(args.data_dir, args.PDB_file, args.cpu, args.delete_auxiliary_files)
+    raphan.optimise()
+    raphan.calculation_time = time() - t
 
     if args.run_full_xtb_optimisation:
-        run_full_xtb_optimisation(proptimus)
+        run_full_xtb_optimisation(raphan)
     print("\n")
