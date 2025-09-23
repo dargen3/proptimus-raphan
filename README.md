@@ -1,6 +1,6 @@
-# Per Residuum Optimisation - Rapid Alternative to Protein Structure Optimisation with Constrained Alpha Carbons (PROPTIMus-RAPHAN)
+# PROPTIMus-RAPHAN
 
-PROPTIMUS-RAPHAN je python program implementující algoritmus Per Residuum Optimisation pro rychlou optimalizaci proteinových sturktur s omezenemýni alpha uhlíky. 
+Per Residuum Optimisation - Rapid Alternative to Protein Structure Optimisation with Constrained Alpha Carbons (PROPTIMus-RAPHAN) je python program implementující algoritmus Per Residuum Optimisation pro rychlou optimalizaci proteinových sturktur s omezenemýni alpha uhlíky. 
 
 ## How to run
 

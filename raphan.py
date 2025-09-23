@@ -7,6 +7,7 @@ from time import time
 import json
 
 import tqdm
+from Bio import SeqUtils
 from Bio.PDB import Select, PDBIO, PDBParser, Superimposer, NeighborSearch
 from rdkit import Chem
 
@@ -71,6 +72,7 @@ class Substructure_data:
         self.atoms_30A = atoms_30A
         self.data_dir = data_dir
         self.optimised_residue_index = optimised_residue_index
+        self.optimised_residue = optimised_residue
         self.archive = []
         self.converged = False
         self.io = io
@@ -231,11 +233,8 @@ def optimise_substructure(substructure_data,
     system(run_xtb)
 
     # check xtb convergence
-    file_path = Path(f"{substructure_data.data_dir}/xtbopt.pdb")
-    xtb_converged = True
-    if not file_path.exists():
-        xtb_converged = False
-
+    if not Path(f"{substructure_data.data_dir}/xtbopt.pdb").exists():
+        return None, False, None
     system(f"cd {substructure_data.data_dir} ; mv xtbopt.log xtbopt_{iteration}.log ; mv xtbopt.pdb xtbopt_{iteration}.pdb")
 
     # superimpose original and optimised structures
@@ -263,7 +262,7 @@ def optimise_substructure(substructure_data,
             max_diffs.append(max(diffs))
         if any([x<0.01 for x in max_diffs]):
             raphan_converged = True
-    return optimised_coordinates, all([xtb_converged, raphan_converged]), substructure_data
+    return optimised_coordinates, raphan_converged, substructure_data
 
 
 class Raphan:
@@ -284,17 +283,19 @@ class Raphan:
         self.optimised_coordinates = [atom.coord for atom in self.structure.get_atoms()]
         with Pool(self.cpu) as pool:
             bar = tqdm.tqdm(total=50,
-                       desc="Structure optimisation",
-                       unit=" iteration")
+                            desc="Structure optimisation",
+                            unit=" iteration")
             max_iterations = 50
             for iteration in range(1, max_iterations+1):
                 bar.update(1)
                 iteration_results = pool.starmap(optimise_substructure, [(substructure, iteration) for substructure in self.substructures_data if not substructure.converged])
-                for optimised_coordinates, sc, substructure_data in iteration_results:
+                for optimised_coordinates, convergence, substructure_data in iteration_results:
+                    if optimised_coordinates is None: # xtb did not converge
+                        continue
                     for optimised_atom_index, optimised_atom_coordinates in optimised_coordinates:
                         self.optimised_coordinates[optimised_atom_index] = optimised_atom_coordinates
                     self.substructures_data[substructure_data.optimised_residue_index-1].archive.append([x[1] for x in optimised_coordinates])
-                    self.substructures_data[substructure_data.optimised_residue_index-1].converged = sc
+                    self.substructures_data[substructure_data.optimised_residue_index-1].converged = convergence
                 for atom, coord in zip(self.structure.get_atoms(), self.optimised_coordinates):
                     atom.coord = coord
                 self.io.save(f"{self.data_dir}/optimised_PDB/{path.basename(self.PDB_file[:-4])}_optimised_{iteration}.pdb")
@@ -303,13 +304,14 @@ class Raphan:
                     bar.refresh()
                     break
             bar.close()
+            self.iterations = iteration
 
             # control of unconverged residues
             unconverged_substructures = [str(substructure_data.optimised_residue_index) for substructure_data in self.substructures_data if not substructure_data.converged]
             if unconverged_substructures:
-                print(f"Warning! Optimisation for residues with indices {', '.join(unconverged_substructures)} did not converge!")
+                print(f"WARNING! OPTIMISATION FOR RESIDUES WITH INDICE(S) {', '.join(unconverged_substructures)} DID NOT CONVERGE!")
 
-        print(f"Saving optimised structure to {f"{self.data_dir}/optimised_PDB/{path.basename(self.PDB_file[:-4])}_optimised.pdb"}... ", end="")
+        print(f"Saving optimised structure to {self.data_dir}/optimised_PDB/{path.basename(self.PDB_file[:-4])}_optimised.pdb... ", end="")
         self.io.save(f"{self.data_dir}/optimised_PDB/{path.basename(self.PDB_file[:-4])}_optimised.pdb")
         print("ok")
 
@@ -373,7 +375,7 @@ def run_full_xtb_optimisation(raphan):
     system(f"mkdir {raphan.data_dir}/full_xtb_optimisation ")
     system(f"mkdir {raphan.data_dir}/full_xtb_optimisation/original ")
     with open(f"{raphan.data_dir}/full_xtb_optimisation/original/xtb_settings.inp", "w") as xtb_settings_file:
-        xtb_settings_file.write(f"$constrain\n    force constant=10.0\n    atoms: {",".join(alpha_carbons_indices)}\n$end""")
+        xtb_settings_file.write(f"$constrain\n    force constant=10.0\n    atoms: {','.join(alpha_carbons_indices)}\n$end")
     t = time()
     system(f"""cd {raphan.data_dir}/full_xtb_optimisation/original;
                export OMP_NUM_THREADS=1,1 ;
@@ -387,7 +389,7 @@ def run_full_xtb_optimisation(raphan):
     # optimise structure optimised with raphan
     system(f"mkdir {raphan.data_dir}/full_xtb_optimisation/raphan ")
     with open(f"{raphan.data_dir}/full_xtb_optimisation/raphan/xtb_settings.inp", "w") as xtb_settings_file:
-        xtb_settings_file.write(f"$constrain\n    force constant=10.0\n    atoms: {",".join(alpha_carbons_indices)}\n$end""")
+        xtb_settings_file.write(f"$constrain\n    force constant=10.0\n    atoms: {','.join(alpha_carbons_indices)}\n$end")
     t = time()
     system(f"""cd {raphan.data_dir}/full_xtb_optimisation/raphan ;
                export OMP_NUM_THREADS=1,1 ;
@@ -433,6 +435,7 @@ def run_full_xtb_optimisation(raphan):
 
     # write results
     results = {"raphan time": raphan.calculation_time,
+               "raphan iterations": raphan.iterations,
                "xtb(original) time": xtb_original_time,
                "xtb(raphan) time": xtb_raphan_time,
                "original/xtb(original) MAD": float(original_xtb_original_difference),
