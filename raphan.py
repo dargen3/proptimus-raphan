@@ -215,7 +215,7 @@ def optimise_substructure(substructure_data,
     $end
     $opt
     maxcycle={len(optimised_atoms_indices)+iteration}
-    microcycle={len(optimised_atoms_indices)+iteration}
+    microcycle={len(optimised_atoms_indices)+iteration+1}
     $end
     """
     substructure_settings = xtb_settings_template.replace("xxx", ", ".join([str(i) for i in constrained_atoms_indices]))
@@ -229,7 +229,7 @@ def optimise_substructure(substructure_data,
                f"export OMP_NUM_THREADS=1,1 ;"
                f"export OMP_MAX_ACTIVE_LEVELS=1 ;"
                f"export MKL_NUM_THREADS=1 ;"
-               f"xtb substructure_{iteration}.pdb --gfnff --input xtb_settings_{iteration}.inp --opt vtight --alpb water --verbose > xtb_output_{iteration}.txt 2> xtb_error_output_{iteration}.txt   ; rm gfnff*")
+               f" xtb substructure_{iteration}.pdb --gfnff --input xtb_settings_{iteration}.inp --opt vtight --alpb water --verbose > xtb_output_{iteration}.txt 2> xtb_error_output_{iteration}.txt ; rm gfnff*")
     system(run_xtb)
 
     # check xtb convergence
