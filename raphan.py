@@ -77,30 +77,57 @@ class Substructure_data:
         self.converged = False
         self.io = io
 
-        self.optimised_atoms = []
+        self.optimised_atoms1 = set()
         for atom in optimised_residue:
             if atom.get_parent().id[1] == 1:  # in first residue optimise also -NH3 function group
-                self.optimised_atoms.append(atom)
+                self.optimised_atoms1.add(atom)
             else:
                 if atom.name not in ["N", "H"]:
-                    self.optimised_atoms.append(atom)
-        for atom in ["N", "H"]: # add atoms from following bonded residue to optimise whole peptide bond
+                    self.optimised_atoms1.add(atom)
+        for atom in ["N", "H"]:  # add atoms from following bonded residue to optimise whole peptide bond
             try:
-                self.optimised_atoms.append(structure[0]["A"][optimised_residue.id[1]+1][atom])
-            except KeyError: # because of last residue
+                self.optimised_atoms1.add(structure[0]["A"][optimised_residue.id[1] + 1][atom])
+            except KeyError:  # because of last residue
                 break
+
+        last_residue_id = list(structure.get_residues())[-1].id
+        self.optimised_atoms2 = set()
+        for atom in optimised_residue:
+            if atom.get_parent().id == last_residue_id:  # in last residue optimise also -COO function group
+                self.optimised_atoms2.add(atom)
+            else:
+                if atom.name not in ["C", "O"]:
+                    self.optimised_atoms2.add(atom)
+        for atom in ["C", "O"]:  # add atoms from previous bonded residue to optimise whole peptide bond
+            try:
+                self.optimised_atoms2.add(structure[0]["A"][optimised_residue.id[1] - 1][atom])
+            except KeyError:  # because of last residue
+                break
+
+        self.final_optimised_atoms = set([atom for atom in optimised_residue])
 
 
 def optimise_substructure(substructure_data,
-                          iteration):
+                          iteration,
+                          phase):
+
+    if phase == "optimisation":
+        if iteration % 2 == 0:
+            optimised_atoms = substructure_data.optimised_atoms1
+        else:
+            optimised_atoms = substructure_data.optimised_atoms2
+        inner_radius = 6
+    elif phase == "final refinement":
+        optimised_atoms = substructure_data.final_optimised_atoms
+        inner_radius = 8
 
     # find effective neighbourhood
     kdtree = NeighborSearch(substructure_data.atoms_30A)
     atoms_in_7A = []
     atoms_in_12A = []
-    for optimised_residue_atom in substructure_data.optimised_atoms:
+    for optimised_residue_atom in optimised_atoms:
         atoms_in_7A.extend(kdtree.search(center=optimised_residue_atom.coord,
-                                         radius=7,
+                                         radius=inner_radius,
                                          level="A"))
         atoms_in_12A.extend(kdtree.search(center=optimised_residue_atom.coord,
                                          radius=12,
@@ -191,9 +218,9 @@ def optimise_substructure(substructure_data,
                              start=1):
         if atom.name == "CA":
             atom.mode = "constrained"
-        elif atom in substructure_data.optimised_atoms:
+        elif atom in optimised_atoms:
             atom.mode = "optimised"
-        elif any(dist(atom.coord, ra.coord) < 4 for ra in substructure_data.optimised_atoms):
+        elif any(dist(atom.coord, ra.coord) < 4 for ra in optimised_atoms):
             atom.mode = "flexible"
         else:
             atom.mode = "constrained"
@@ -229,12 +256,12 @@ def optimise_substructure(substructure_data,
                f"export OMP_NUM_THREADS=1,1 ;"
                f"export OMP_MAX_ACTIVE_LEVELS=1 ;"
                f"export MKL_NUM_THREADS=1 ;"
-               f" xtb substructure_{iteration}.pdb --gfnff --input xtb_settings_{iteration}.inp --opt vtight --alpb water --verbose > xtb_output_{iteration}.txt 2> xtb_error_output_{iteration}.txt ; rm gfnff*")
+               f" xtb substructure_{iteration}.pdb --gfnff --input xtb_settings_{iteration}.inp --opt tight --alpb water --verbose > xtb_output_{iteration}.txt 2> xtb_error_output_{iteration}.txt ; rm gfnff*")
     system(run_xtb)
 
     # check xtb convergence
     if not Path(f"{substructure_data.data_dir}/xtbopt.pdb").exists():
-        return None, False, None
+        return None, False, None, None
     system(f"cd {substructure_data.data_dir} ; mv xtbopt.log xtbopt_{iteration}.log ; mv xtbopt.pdb xtbopt_{iteration}.pdb")
 
     # superimpose original and optimised structures
@@ -253,16 +280,22 @@ def optimise_substructure(substructure_data,
         original_atom_index = substructure_atoms[optimised_atom_index - 1].serial_number - 1
         optimised_coordinates.append((original_atom_index, optimised_atom_coord))
 
+    central_residue_coordinates = []
+    for atom in optimised_substructure_atoms:
+        if atom.get_parent().id[1] == substructure_data.optimised_residue_index:
+            central_residue_coordinates.append(atom.coord)
+
     # check raphan convergence
     raphan_converged = False
     if len(substructure_data.archive) > 1:
         max_diffs = []
         for x in range(1, 3):
-            diffs = [dist(a,b) for a,b in zip([x[1] for x in optimised_coordinates], substructure_data.archive[-x])]
+            # diffs = [dist(a,b) for a,b in zip([x[1] for x in optimised_coordinates], substructure_data.archive[-x])]
+            diffs = [dist(a,b) for a,b in zip(central_residue_coordinates, substructure_data.archive[-x])]
             max_diffs.append(max(diffs))
         if any([x<0.01 for x in max_diffs]):
             raphan_converged = True
-    return optimised_coordinates, raphan_converged, substructure_data
+    return optimised_coordinates, raphan_converged, substructure_data, central_residue_coordinates
 
 
 class Raphan:
@@ -282,26 +315,43 @@ class Raphan:
         # optimise
         self.optimised_coordinates = [atom.coord for atom in self.structure.get_atoms()]
         with Pool(self.cpu) as pool:
-            bar = tqdm.tqdm(total=50,
+            bar = tqdm.tqdm(total=100,
                             desc="Structure optimisation",
                             unit=" iteration")
-            max_iterations = 50
-            for iteration in range(1, max_iterations+1):
+            for iteration in range(1, 50):
                 bar.update(1)
-                iteration_results = pool.starmap(optimise_substructure, [(substructure, iteration) for substructure in self.substructures_data if not substructure.converged])
-                for optimised_coordinates, convergence, substructure_data in iteration_results:
+                iteration_results = pool.starmap(optimise_substructure, [(substructure, iteration, "optimisation") for substructure in self.substructures_data if not substructure.converged])
+                for optimised_coordinates, convergence, substructure_data, ccc in iteration_results:
                     if optimised_coordinates is None: # xtb did not converge
                         continue
                     for optimised_atom_index, optimised_atom_coordinates in optimised_coordinates:
                         self.optimised_coordinates[optimised_atom_index] = optimised_atom_coordinates
-                    self.substructures_data[substructure_data.optimised_residue_index-1].archive.append([x[1] for x in optimised_coordinates])
+                    self.substructures_data[substructure_data.optimised_residue_index-1].archive.append(ccc)
                     self.substructures_data[substructure_data.optimised_residue_index-1].converged = convergence
                 for atom, coord in zip(self.structure.get_atoms(), self.optimised_coordinates):
                     atom.coord = coord
                 self.io.save(f"{self.data_dir}/optimised_PDB/{path.basename(self.PDB_file[:-4])}_optimised_{iteration}.pdb")
                 if all([substructure_data.converged for substructure_data in self.substructures_data]):
-                    bar.update(max_iterations - iteration)
-                    bar.refresh()
+                    break
+
+            for substructure_data in self.substructures_data:
+                substructure_data.converged = False
+
+            # for iteration in range(50, 100):
+            for iteration in range(iteration, iteration+50):
+                bar.update(1)
+                iteration_results = pool.starmap(optimise_substructure, [(substructure, iteration, "final refinement") for substructure in self.substructures_data if not substructure.converged])
+                for optimised_coordinates, convergence, substructure_data, ccc in iteration_results:
+                    if optimised_coordinates is None: # xtb did not converge
+                        continue
+                    for optimised_atom_index, optimised_atom_coordinates in optimised_coordinates:
+                        self.optimised_coordinates[optimised_atom_index] = optimised_atom_coordinates
+                    self.substructures_data[substructure_data.optimised_residue_index-1].archive.append(ccc)
+                    self.substructures_data[substructure_data.optimised_residue_index-1].converged = convergence
+                for atom, coord in zip(self.structure.get_atoms(), self.optimised_coordinates):
+                    atom.coord = coord
+                self.io.save(f"{self.data_dir}/optimised_PDB/{path.basename(self.PDB_file[:-4])}_optimised_{iteration}.pdb")
+                if all([substructure_data.converged for substructure_data in self.substructures_data]):
                     break
             bar.close()
             self.iterations = iteration
@@ -381,7 +431,7 @@ def run_full_xtb_optimisation(raphan):
                export OMP_NUM_THREADS=1,1 ;
                export MKL_NUM_THREADS=1 ;
                export OMP_MAX_ACTIVE_LEVELS=1 ;
-               export OMP_STACKSIZE=200G ;
+               export OMP_STACKSIZE=5G ;
                ulimit -s unlimited ;
                xtb ../../inputed_PDB/{path.basename(raphan.PDB_file)} --opt --alpb water --verbose --gfnff --input xtb_settings.inp --verbose > xtb_output.txt 2> xtb_error_output.txt""")
     xtb_original_time = time() - t
@@ -395,7 +445,7 @@ def run_full_xtb_optimisation(raphan):
                export OMP_NUM_THREADS=1,1 ;
                export MKL_NUM_THREADS=1 ;
                export OMP_MAX_ACTIVE_LEVELS=1 ;
-               export OMP_STACKSIZE=200G ;
+               export OMP_STACKSIZE=5G ;
                ulimit -s unlimited ;
                xtb ../../optimised_PDB/{path.basename(raphan.PDB_file[:-4])}_optimised.pdb --opt --alpb water --verbose --gfnff --input xtb_settings.inp --verbose > xtb_output.txt 2> xtb_error_output.txt""")
     xtb_raphan_time = time() - t
