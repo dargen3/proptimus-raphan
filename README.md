@@ -54,7 +54,7 @@ git clone https://github.com/sb-ncbr/proptimus_raphan
 
 `--cpu CPU`                                       How many CPUs should be used for the calculation.
 
-`--delete_auxiliary_files`                        Auxiliary calculation files can be large. With this argument, the auxiliary files will be deleted during the calculation. Do not use in combination with the argument `--constrained_alpha_carbons_optimisations`!
+`--delete_auxiliary_files`                        Auxiliary calculation files can be large. With this argument, the auxiliary files will be deleted during the calculation. Do not use in combination with the argument `‑‑constrained_alpha_carbons_optimisations`!
 
 `--constrained_alpha_carbons_optimisations`       To test the methodology. The original structure and the PROPTIMUS RAPHAN–optimised structure will be optimised with constrained alpha carbons. Short comparison will be stored in <data_dir>/comparison.json. Please note that optimisation with constrained alpha carbons is computationally expensive for larger protein structures.
 
