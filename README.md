@@ -1,22 +1,62 @@
-# PROPTIMus-RAPHAN
+# PROPTIMUS RAPHAN
 
-Per Residuum Optimisation - Rapid Alternative to Protein Structure Optimisation with Constrained Alpha Carbons (PROPTIMus-RAPHAN) je python program implementující algoritmus Per Residuum Optimisation pro rychlou optimalizaci proteinových sturktur s omezenemýni alpha uhlíky. 
+## Description
 
-## How to run
+PROPTIMUS RAPHAN is a rapid alternative to optimisation with constrained alpha carbons. This approach divides a protein structure into overlapping substructures, allowing each to be optimised independently. As a result, the computation time is linear with respect to the size of the structure. Our approach can achieve results comparable to the overall optimisation of the structure with constrained alpha carbons in significantly less time. PROPTIMUS RAPHAN employs an almost quantum-mechanical-accurate force field, [GFN-FF](https://onlinelibrary.wiley.com/doi/10.1002/anie.202004239). This force field is generic, physics-based, and suitable for large molecular systems. The details about the methodology are described in the [wiki](https://github.com/sb-ncbr/proptimus_raphan/wiki).
+
+## Getting Started
+
+**1. Download and run the [Miniconda](https://www.anaconda.com/docs/getting-started/miniconda/main) installer**
+
+```
+wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+bash Miniconda3-latest-Linux-x86_64.sh
+```
+
+**2. Set up Virtual Environment (Optional but Recommended)**
+
+* Create a virtual environment named `proptimus_raphan_env`:
+
+```
+conda -m proptimus_raphan_env 
+```
+
+* Activate the virtual environment:
+
+```
+conda activate proptimus_raphan_env
+```
+
+**3. Install Required Packages**
+
+* Make sure your virtual environment is activated, then run:
+
+```
+conda install -c conda-forge xtb=6.6.1 biopython=1.8.5 rdkit=2024.9.6 tqdm=4.67.1
+```
+
+## Executing the calculation
+
+### Positional arguments (required)
+
+`--PDB_file PDB_FILE `          PDB file with structure, which should be optimised.
+
+`--data_dir DATA_DIR `          Directory for saving results.
+
+### Optional arguments
+
+`--cpu CPU`                                       How many CPUs should be used for the calculation.
+
+`--delete_auxiliary_files`                        Auxiliary calculation files can be large. With this argument, the auxiliary files will be deleted during the calculation. Do not use in combination with the argument --constrained_alpha_carbons_optimisations!
+
+`--constrained_alpha_carbons_optimisations`       For testing the methodology. The original structure and the PROPTIMUS RAPHAN optimized structure will be optimized with constrained alpha carbons. Short comparison will be stored in <data_dir>/comparison.json. Please note that optimization with constrained alpha carbons is computationally expensive for larger protein structures.
+
+### Example of executing the calculation:
 
 ```bash
-$  python raphan.py --PDB_file examples/P0DL07.pdb --data_dir P0DL07_test --run_full_xtb_optimisation
+$  python raphan.py --PDB_file examples/P0DL07.pdb --data_dir P0DL07_test
 ```
-Struktury examples/P0DL07_optimised.pdb a P0DL07_test/optimised_structure/P0DL07_optimised_final.pdb by měly být totožné.
 
-V adresáři P0DL07 by měl být soubor data.json, který by měl vypadat nějak takto :
-```
-{
-    "raphan time": 2.480051279067993,       # může se mírně lišit
-    "xtb(original) time": 1.620025396347046,   # může se mírně lišit
-    "xtb(raphan) time": 0.7602341175079346,  # může se mírně lišit
-    "original/xtb(original) MAD": 0.5124319791793823,     # mělo by být stejné
-    "proptimus/xtb(raphan) MAD": 0.028605064377188683,    # mělo by být stejné
-    "xtb(raphan)/xtb(original)": 0.09751877188682556      # mělo by být stejné
-}
-```
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](https://github.com/sb-ncbr/rings-conformation-validation/blob/main/LICENSE) file for details.
