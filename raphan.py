@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import argparse
 from math import dist
 from multiprocessing import Pool

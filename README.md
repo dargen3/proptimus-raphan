@@ -18,7 +18,7 @@ bash Miniconda3-latest-Linux-x86_64.sh
 * Create a virtual environment named `proptimus_raphan_env`:
 
 ```
-conda -m proptimus_raphan_env 
+conda create -n proptimus_raphan_env python=3.12
 ```
 
 * Activate the virtual environment:
@@ -32,12 +32,19 @@ conda activate proptimus_raphan_env
 * Make sure your virtual environment is activated, then run:
 
 ```
-conda install -c conda-forge xtb=6.6.1 biopython=1.8.5 rdkit=2024.9.6 tqdm=4.67.1
+conda install -c conda-forge libgfortran=3.0.0 xtb=6.6.1 biopython=1.85 rdkit=2025.09.1 tqdm=4.67.1
 ```
+
+**4. Clone this github repository:**
+
+```
+git clone https://github.com/sb-ncbr/proptimus_raphan
+```
+
 
 ## Executing the calculation
 
-### Positional arguments (required)
+### Required arguments
 
 `--PDB_file PDB_FILE `          PDB file with structure, which should be optimised.
 
@@ -54,7 +61,14 @@ conda install -c conda-forge xtb=6.6.1 biopython=1.8.5 rdkit=2024.9.6 tqdm=4.67.
 ### Example of executing the calculation:
 
 ```bash
+$  conda activate proptimus_raphan_env
+$  cd proptimus_raphan
 $  python raphan.py --PDB_file examples/P0DL07.pdb --data_dir P0DL07_test
+```
+For testing purposes, you can compare the optimized structure with the reference:
+
+```bash
+$  diff examples/P0DL07_optimised.pdb P0DL07_test/optimised_PDB/P0DL07_optimised.pdb
 ```
 
 ## License
