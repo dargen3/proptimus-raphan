@@ -106,8 +106,7 @@ def optimise_substructure(substructure_data,
         inner_radius = 6
     elif phase == "final refinement":
         optimised_atoms = substructure_data.final_optimised_atoms
-        inner_radius = 6
-
+        inner_radius = 8
 
     # find effective neighbourhood
     kdtree = NeighborSearch(substructure_data.atoms_30A)
@@ -340,6 +339,8 @@ class Raphan:
                     atom.coord = coord
                 self.io.save(f"{self.data_dir}/optimised_PDB/{path.basename(self.PDB_file[:-4])}_optimised_{iteration}.pdb")
                 if all([substructure_data.converged for substructure_data in self.substructures_data]):
+                    bar.update(100 - iteration)
+                    bar.refresh()
                     break
             bar.close()
             self.iterations = iteration
