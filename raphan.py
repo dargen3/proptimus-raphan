@@ -103,19 +103,19 @@ def optimise_substructure(substructure_data,
 
     if phase == "optimisation":
         optimised_atoms = substructure_data.optimised_atoms
-        inner_radius = 6
+        minimum_radius = 6
     elif phase == "final refinement":
         optimised_atoms = substructure_data.final_optimised_atoms
-        inner_radius = 8
+        minimum_radius = 8
 
     # find effective neighbourhood
     kdtree = NeighborSearch(substructure_data.atoms_30A)
-    atoms_in_7A = []
+    atoms_in_minimum_radius = []
     atoms_in_12A = []
     for optimised_residue_atom in optimised_atoms:
 
-        atoms_in_7A.extend(kdtree.search(center=optimised_residue_atom.coord,
-                                         radius=inner_radius,
+        atoms_in_minimum_radius.extend(kdtree.search(center=optimised_residue_atom.coord,
+                                         radius=minimum_radius,
                                          level="A"))
         atoms_in_12A.extend(kdtree.search(center=optimised_residue_atom.coord,
                                          radius=12,
@@ -125,9 +125,9 @@ def optimise_substructure(substructure_data,
 
     # create pdb files to can load them with RDKit
     selector = AtomSelector()
-    selector.full_ids = set([atom.full_id for atom in atoms_in_7A])
-    selector.res_full_ids = set([atom.get_parent().full_id for atom in atoms_in_7A])
-    substructure_data.io.save(file=f"{substructure_data.data_dir}/atoms_in_7A.pdb",
+    selector.full_ids = set([atom.full_id for atom in atoms_in_minimum_radius])
+    selector.res_full_ids = set([atom.get_parent().full_id for atom in atoms_in_minimum_radius])
+    substructure_data.io.save(file=f"{substructure_data.data_dir}/atoms_in_minimum_radius.pdb",
                               select=selector,
                               preserve_atom_numbering=True)
     selector.full_ids = set([atom.full_id for atom in atoms_in_12A])
@@ -137,7 +137,7 @@ def optimise_substructure(substructure_data,
                               preserve_atom_numbering=True)
 
     # load pdb files with RDKit
-    mol_min_radius = Chem.MolFromPDBFile(pdbFileName=f"{substructure_data.data_dir}/atoms_in_7A.pdb",
+    mol_min_radius = Chem.MolFromPDBFile(pdbFileName=f"{substructure_data.data_dir}/atoms_in_minimum_radius.pdb",
                                          removeHs=False,
                                          sanitize=False)
     mol_min_radius_conformer = mol_min_radius.GetConformer()
