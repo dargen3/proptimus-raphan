@@ -60,7 +60,7 @@ For testing purposes, you can compare the optimized structure with the reference
 ```bash
 $  diff examples/P0DL07_optimised.pdb P0DL07_test/optimised_PDB/P0DL07_optimised.pdb
 ```
-
+Please note that the resulting structures may vary slightly. This is due to numerical instabilities caused by running on different hardware.
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](https://github.com/sb-ncbr/rings-conformation-validation/blob/main/LICENSE) file for details.
