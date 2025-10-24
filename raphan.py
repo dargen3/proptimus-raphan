@@ -103,32 +103,28 @@ def optimise_substructure(substructure_data,
 
     if phase == "optimisation":
         optimised_atoms = substructure_data.optimised_atoms
-        inner_radius = 6
+        minimum_radius = 6
     elif phase == "final refinement":
         optimised_atoms = substructure_data.final_optimised_atoms
-        inner_radius = 6
-
+        minimum_radius = 8
 
     # find effective neighbourhood
     kdtree = NeighborSearch(substructure_data.atoms_30A)
-    atoms_in_7A = []
+    atoms_in_minimum_radius = []
     atoms_in_12A = []
     for optimised_residue_atom in optimised_atoms:
-
-        atoms_in_7A.extend(kdtree.search(center=optimised_residue_atom.coord,
-                                         radius=inner_radius,
+        atoms_in_minimum_radius.extend(kdtree.search(center=optimised_residue_atom.coord,
+                                         radius=minimum_radius,
                                          level="A"))
         atoms_in_12A.extend(kdtree.search(center=optimised_residue_atom.coord,
                                          radius=12,
                                          level="A"))
 
-        
-
     # create pdb files to can load them with RDKit
     selector = AtomSelector()
-    selector.full_ids = set([atom.full_id for atom in atoms_in_7A])
-    selector.res_full_ids = set([atom.get_parent().full_id for atom in atoms_in_7A])
-    substructure_data.io.save(file=f"{substructure_data.data_dir}/atoms_in_7A.pdb",
+    selector.full_ids = set([atom.full_id for atom in atoms_in_minimum_radius])
+    selector.res_full_ids = set([atom.get_parent().full_id for atom in atoms_in_minimum_radius])
+    substructure_data.io.save(file=f"{substructure_data.data_dir}/atoms_in_minimum_radius.pdb",
                               select=selector,
                               preserve_atom_numbering=True)
     selector.full_ids = set([atom.full_id for atom in atoms_in_12A])
@@ -138,7 +134,7 @@ def optimise_substructure(substructure_data,
                               preserve_atom_numbering=True)
 
     # load pdb files with RDKit
-    mol_min_radius = Chem.MolFromPDBFile(pdbFileName=f"{substructure_data.data_dir}/atoms_in_7A.pdb",
+    mol_min_radius = Chem.MolFromPDBFile(pdbFileName=f"{substructure_data.data_dir}/atoms_in_minimum_radius.pdb",
                                          removeHs=False,
                                          sanitize=False)
     mol_min_radius_conformer = mol_min_radius.GetConformer()
@@ -270,11 +266,6 @@ def optimise_substructure(substructure_data,
         original_atom_index = substructure_atoms[optimised_atom_index - 1].serial_number - 1
         optimised_coordinates.append((original_atom_index, optimised_atom_coord))
 
-    central_residue_coordinates = []
-    for atom in optimised_substructure_atoms:
-        if atom.get_parent().id[1] == substructure_data.optimised_residue_index:
-            central_residue_coordinates.append(atom.coord)
-
     # check raphan convergence
     raphan_converged = False
     if len(substructure_data.archive) > 1:
@@ -301,17 +292,17 @@ class Raphan:
     def optimise(self):
         self._load_molecule()
 
-        # optimise
         self.optimised_coordinates = [atom.coord for atom in self.structure.get_atoms()]
+        bar = tqdm.tqdm(total=100,
+                        desc="Structure optimisation",
+                        unit=" iteration")
         with Pool(self.cpu) as pool:
-            bar = tqdm.tqdm(total=100,
-                            desc="Structure optimisation",
-                            unit=" iteration")
+            # optimisation
             for iteration in range(1, 50):
                 bar.update(1)
                 iteration_results = pool.starmap(optimise_substructure, [(substructure, iteration, "optimisation") for substructure in self.substructures_data if not substructure.converged])
                 for optimised_coordinates, convergence, substructure_data in iteration_results:
-                    if optimised_coordinates is None: # xtb did not converge
+                    if optimised_coordinates is None:  # xtb did not converge
                         continue
                     for optimised_atom_index, optimised_atom_coordinates in optimised_coordinates:
                         self.optimised_coordinates[optimised_atom_index] = optimised_atom_coordinates
@@ -323,9 +314,9 @@ class Raphan:
                 if all([substructure_data.converged for substructure_data in self.substructures_data]):
                     break
 
+            # final refinement
             for substructure_data in self.substructures_data:
                 substructure_data.converged = False
-
             for iteration in range(iteration+1, iteration+51):
                 bar.update(1)
                 iteration_results = pool.starmap(optimise_substructure, [(substructure, iteration, "final refinement") for substructure in self.substructures_data if not substructure.converged])
@@ -340,6 +331,8 @@ class Raphan:
                     atom.coord = coord
                 self.io.save(f"{self.data_dir}/optimised_PDB/{path.basename(self.PDB_file[:-4])}_optimised_{iteration}.pdb")
                 if all([substructure_data.converged for substructure_data in self.substructures_data]):
+                    bar.update(100 - iteration)
+                    bar.refresh()
                     break
             bar.close()
             self.iterations = iteration
@@ -358,8 +351,7 @@ class Raphan:
             system(f"cd {self.data_dir};"
                    f"mv optimised_PDB/{path.basename(self.PDB_file[:-4])}_optimised.pdb .;"
                    f"rm -r sub_* optimised_PDB input_PDB")
-            print(" ok")
-
+            print("ok")
 
     def _load_molecule(self):
         print(f"Loading of structure from {self.PDB_file}... ", end="")
@@ -397,9 +389,8 @@ class Raphan:
             system(f"mkdir {self.data_dir}/sub_{residue_number}")
         print("ok")
 
-
 def run_constrained_alpha_optimisations(raphan):
-    print("Running constrained alpha optimisation...", end="")
+    print("Running constrained alpha optimisation... ", end="")
 
     # find alpha_carbons_indices to constrain them
     alpha_carbons_indices = []
@@ -487,7 +478,7 @@ def run_constrained_alpha_optimisations(raphan):
                "GFN-FFca / PROPTIMUS RAPHANgfnff + GFN-FFca": GFNFFca__PROPTIMUS_RAPHANgfnff_GFNFFca_difference}
     with open(f"{raphan.data_dir}/comparison.json", 'w') as data_json:
         json.dump(results, data_json, indent=4)
-    print(" ok")
+    print("ok")
 
 
 if __name__ == '__main__':
@@ -499,4 +490,4 @@ if __name__ == '__main__':
 
     if args.constrained_alpha_carbons_optimisations:
         run_constrained_alpha_optimisations(raphan)
-    print("\n")
+    print("")

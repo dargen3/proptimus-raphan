@@ -13,13 +13,13 @@ wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
 bash Miniconda3-latest-Linux-x86_64.sh
 ```
 
-**2. Clone this GitHub repository:**
+**2. Clone GitHub repository:**
 
 ```
 git clone https://github.com/sb-ncbr/proptimus_raphan
 ```
 
-**3. Set up a virtual environment**
+**3. Set up Virtual Environment**
 
 * Create a virtual environment named `proptimus_raphan_env`:
 
@@ -32,7 +32,6 @@ conda env create -f proptimus_raphan/environment.yml
 ```
 conda activate proptimus_raphan_env
 ```
-
 
 ## Executing the calculation
 
@@ -53,8 +52,8 @@ conda activate proptimus_raphan_env
 ### Example of executing the calculation:
 
 ```bash
-cd proptimus_raphan
-python raphan.py --PDB_file examples/P0DL07.pdb --data_dir P0DL07_test
+$  cd proptimus_raphan
+$  python raphan.py --PDB_file examples/P0DL07.pdb --data_dir P0DL07_test
 ```
 For testing purposes, you can compare the optimised structure with the reference:
 
@@ -62,7 +61,6 @@ For testing purposes, you can compare the optimised structure with the reference
 diff examples/P0DL07_optimised.pdb P0DL07_test/optimised_PDB/P0DL07_optimised.pdb
 ```
 Please note that the resulting structures may vary slightly. This is due to numerical instabilities caused by running on different hardware.
-
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](https://github.com/sb-ncbr/proptimus_raphan/blob/main/LICENSE) file for details.
