@@ -14,7 +14,7 @@ from rdkit import Chem
 
 
 def load_arguments():
-    print("\nParsing arguments... ", end="")
+    print("\nParsing arguments... ", end="", flush=True)
     parser = argparse.ArgumentParser()
     parser.add_argument('--PDB_file',
                         type=str,
@@ -342,7 +342,7 @@ class Raphan:
             if unconverged_substructures:
                 print(f"WARNING! OPTIMISATION FOR RESIDUES WITH INDICE(S) {', '.join(unconverged_substructures)} DID NOT CONVERGE!")
 
-        print(f"Saving optimised structure to {self.data_dir}/optimised_PDB/{path.basename(self.PDB_file[:-4])}_optimised.pdb... ", end="")
+        print(f"Saving optimised structure to {self.data_dir}/optimised_PDB/{path.basename(self.PDB_file[:-4])}_optimised.pdb... ", end="", flush=True)
         self.io.save(f"{self.data_dir}/optimised_PDB/{path.basename(self.PDB_file[:-4])}_optimised.pdb")
         print("ok")
 
@@ -354,7 +354,7 @@ class Raphan:
             print("ok")
 
     def _load_molecule(self):
-        print(f"Loading of structure from {self.PDB_file}... ", end="")
+        print(f"Loading of structure from {self.PDB_file}... ", end="", flush=True)
 
         # open PDB file by Biopython
         try:
@@ -390,7 +390,7 @@ class Raphan:
         print("ok")
 
 def run_constrained_alpha_optimisations(raphan):
-    print("Running constrained alpha optimisation... ", end="")
+    print("Running constrained alpha optimisation... ", end="", flush=True)
 
     # find alpha_carbons_indices to constrain them
     alpha_carbons_indices = []
